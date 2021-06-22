@@ -1,11 +1,13 @@
 
+
+
 import java.sql.Connection;
 
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-
+import java.util.HashMap;
 
 public class Db_project {
     static Connection db_con_obj = null;
@@ -66,6 +68,11 @@ public class Db_project {
          City tmpc = new City(cityname,terms,geoVector);
          
          City.getCitiesSearched().put(tmpc.getName(), tmpc);
+         
+         
+         
+        
+         
          
        }
     }

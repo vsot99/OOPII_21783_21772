@@ -1,4 +1,8 @@
 import java.io.IOException;
+
+
+
+
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -27,20 +31,15 @@ public class City implements Comparable<City>{
     public City( String name ){
     	
         this.name = name;
-		try {
-			this.insertData(name);
-		} catch (IOException e) {
-			System.out.println("Something gone bad");
-		}
+		this.insertData(name);
 		City.getCitiesSearched().put(this.name, this);
-		Db_project.addDataToDB(this);
     }
     
     public City(String name,int t[],double d[]) {
-        this.name=name;
-        this.termsVector=t;
-        this.geodesicVector=d;
-
+    	this.name=name;
+    	this.termsVector=t;
+    	this.geodesicVector=d;
+    	
     }
     
     /** Retrieves data from OpenWeatherMap and Wikipedia and sets values to the Object's attributes. Uses the countOccurences function.
@@ -50,26 +49,32 @@ public class City implements Comparable<City>{
      * @throws JsonMappingException 
      * @throws JsonParseException 
      */
-    public void insertData(String city) throws JsonParseException, JsonMappingException, MalformedURLException, IOException {
-    	String appid = "1e6bd9bafc4701c7857329e884075be7" ;
-    	ObjectMapper mapper = new ObjectMapper(); 
-    	
-	   	OpenWeatherMap weather_obj = mapper.readValue(new URL("http://api.openweathermap.org/data/2.5/weather?q="+city+"&APPID="+appid+""), OpenWeatherMap.class);
-	   	
-	   	double[] tmpGeo = new double[2];
-	 	tmpGeo[0] = weather_obj.getCoord().getLat();
-	 	tmpGeo[1] = weather_obj.getCoord().getLon();
-	 	this.setGeodesicVector(tmpGeo);
-	 	
-	    MediaWiki mediaWiki_obj =  mapper.readValue(new URL("https://en.wikipedia.org/w/api.php?action=query&prop=extracts&titles="+city+"&format=json&formatversion=2"),MediaWiki.class);
-	   
-	    int[] tmpTerms = new int[10];
-	    for(int i = 0; i < tmpTerms.length; i++){
-	    	tmpTerms[i] = countOccurences(mediaWiki_obj.getQuery().getPages().get(0).getExtract(), terms[i]);
-	    }
-	    this.setTermsVector(tmpTerms);
-	 	
+  
+    
+    public void insertData(String city) {
+
+        //Create threads
+        WikipediaThread t1 = new WikipediaThread(city);
+        OpenWeatherThread t2 = new OpenWeatherThread(city);
+        //Create controllers
+        Thread wikiCtrl = new Thread(t1);
+        Thread weatherCtrl = new Thread(t2);
+        //start
+        wikiCtrl.start();
+        weatherCtrl.start();
+        //wait for them to finish
+        try {
+            wikiCtrl.join();
+            weatherCtrl.join();
+        } catch (InterruptedException e){
+            e.printStackTrace();
+        } 
+        this.setGeodesicVector(t2.getGeoVector());
+        this.setTermsVector(t1.getTmpTerms());
+
     }
+    
+    
     
     /** Counts the number of times a criterion occurs in the city wikipedia article
      * @param cityArticle The string of the wikipedia article

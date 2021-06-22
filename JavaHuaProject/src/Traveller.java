@@ -1,10 +1,17 @@
+
+
 import java.io.File;
+
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonGenerationException;
+//import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -17,8 +24,9 @@ public abstract class Traveller implements Comparable<Traveller>{
         private long timestamp;
         private String visit;
         private String residenceCity;
-        private String[] candidateCities = {"London", "Rome", "Lisbon"};   //hardcoded
-        private int[] preferencesVector = {5, 8, 8, 3, 2, 6, 6, 7, 9, 10}; //hardcoded
+        private String[] candidateCities ={"rome","lisbon","berlin"};   //hardcoded
+        private  int[] preferencesVector = new int[10];
+        	//{5, 8, 8, 3, 2, 6, 6, 7, 9, 10}; //hardcoded
         private double[] locationVector = new double[2];
         private ArrayList<City> cities = new ArrayList<City>(); 
         
@@ -30,25 +38,28 @@ public abstract class Traveller implements Comparable<Traveller>{
         	this.setTimestamp(date.getTime());
         	this.insertLocation();
         	this.produceCities();
-        	     	
+        	
+        	
         }
+        
+       
         
         /** Produces a temporary City object with the users city of residence,
            and sets the location vector of the traveller using the opendata.
         */
         public void insertLocation() {
         	
-        	/*
-        	if ( Traveller.searched(this.getResidenceCity()) ) {
+        	
+        	/*if ( Traveller.searched(this.getResidenceCity()) ) {
         		
         		this.setLocationVector( City.getCitiesSearched().get(this.residenceCity).getGeodesicVector() );
         		
-        	} else {
-        	*/
+        	} else { */
+        	
         		
         		City tmp = new City(this.getResidenceCity());
         		
-        		//City.getCitiesSearched().put(tmp.getName(), tmp);
+        		City.getCitiesSearched().put(tmp.getName(), tmp);
             	this.setLocationVector(tmp.getGeodesicVector());
         	//}
         	
@@ -62,25 +73,24 @@ public abstract class Traveller implements Comparable<Traveller>{
         
             for (int i = 0; i < this.getCandidateCities().length; i++ ) {
             	
-            	/*
-            	  if ( Traveller.searched(getCandidateCities()[i]) ) {
-            		this.getCities().add( City.getCitiesSearched().get(getCandidateCities()[i]) );
-            	} else {
             	
-            	*/	
+            	  /*if ( Traveller.searched(getCandidateCities()[i]) ) {
+            		this.getCities().add( City.getCitiesSearched().get(getCandidateCities()[i]) );
+            	} else { */
+            	
+            	
             		
             		
             		City c = new City(this.getCandidateCities()[i]);
             		this.getCities().add(c);
             		
-            	    //City.getCitiesSearched().put(c.getName(), c);
+            	    City.getCitiesSearched().put(c.getName(), c);
             	//}
             		
             }
         }
         
         public abstract double similarity_terms_vector(City city);
-        
         
         public static double similarity_geodesic_vector(Traveller t,City c){
         	
@@ -92,7 +102,7 @@ public abstract class Traveller implements Comparable<Traveller>{
 
         public static double distance(Traveller t,City c) { 
             double result= 0;
-            final int r=6371; //ακτίνα της γης.
+            final int r=6371; 
 
             double latDistance = Math.toRadians(c.getGeodesicVector()[0]-t.getLocationVector()[0]);
             double lonDistance = Math.toRadians(c.getGeodesicVector()[1]-t.getLocationVector()[1]);
@@ -101,14 +111,14 @@ public abstract class Traveller implements Comparable<Traveller>{
 
             double cr = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-            result=r*cr; //αποτελεσμα
+            result=r*cr; 
             
             return  result;
 
         }
         
         public static void printTravellers() {
-        	ArrayList<Traveller> tmp = new ArrayList<Traveller>(Traveller.getTravellers());
+        	ArrayList<Traveller> tmp = new ArrayList<Traveller>(getTravellers());
         	Collections.sort(tmp);
         	
         	ArrayList<Traveller> noDupl = new ArrayList<Traveller>();
@@ -164,6 +174,43 @@ public abstract class Traveller implements Comparable<Traveller>{
         */
         
         
+        
+        public static void fixTravellers() {
+        	for(Traveller t : Traveller.getTravellers()) {
+        		for(City c : t.getCities()) {
+        			c.setSimilarity(City.calculate_similarity(t, c));
+        		}
+        	}
+        }
+        
+        
+      //COLLABORATIVE FILTERING-------------------------------------------------------------------------------------------------------------------------
+
+        public String getAlternative() {
+
+            Map<String, Integer> cityRanks = Traveller.getTravellers().stream().collect(Collectors.toMap(i->i.getVisit(), i->Traveller.innerDot(this, i)));
+            Map.Entry<String, Integer> maxEntry = null;
+            for(Map.Entry<String, Integer> entry : cityRanks.entrySet()) {
+                if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0){
+                    maxEntry = entry;
+                }
+            }
+            return maxEntry.getKey();
+
+        }
+
+        public static int innerDot(Traveller curTraveller, Traveller traveller) {
+
+            int sum = 0;
+            int curTravellerPref[] = curTraveller.getPreferencesVector();
+            int travellerPref[] = traveller.getPreferencesVector();
+            for(int i =0; i < curTravellerPref.length; i++) {
+                sum += curTravellerPref[i] * travellerPref[i];
+            }
+            return sum;
+        }
+        
+        
         //GETTERS AND SETTERS---------------------------------------------------------------------------------------------------------------------------
         
 		public int getAge() {
@@ -178,16 +225,16 @@ public abstract class Traveller implements Comparable<Traveller>{
 			return candidateCities;
 		}
 
-		public void setCandidateCities(String[] candidateCities) {
-			this.candidateCities = candidateCities;
+		public void setCandidateCities(String candidateCities) {
+			this.candidateCities = candidateCities.split(",");
 		}
 
 		public int[] getPreferencesVector() {
 			return preferencesVector;
 		}
 
-		public void setPreferencesVector(int[] preferencesVector) {
-			this.preferencesVector = preferencesVector;
+		public void setPreferencesVector(int trm,int i) {
+			this.preferencesVector[i] =trm;
 		}
 
 		public double[] getLocationVector() {
